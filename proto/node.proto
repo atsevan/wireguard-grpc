@@ -1,0 +1,20 @@
+syntax = "proto3";
+option go_package = "pb/wg";
+import "wgtypes.proto";
+
+service WireGuard {
+  rpc ConfigureDevice(ConfigureDeviceRequest)
+      returns (ConfigureDeviceResponse) {}
+  rpc Devices(DevicesRequest) returns (DevicesResponse) {}
+  rpc Device(DeviceRequest) returns (DeviceResponse) {}
+}
+
+message ConfigureDeviceRequest {
+  string name = 1;
+  wgtypes.Config config = 2;
+}
+message ConfigureDeviceResponse {}
+message DevicesRequest {}
+message DevicesResponse { repeated wgtypes.Device devices = 1; }
+message DeviceRequest { string name = 1; }
+message DeviceResponse { wgtypes.Device device = 1; }

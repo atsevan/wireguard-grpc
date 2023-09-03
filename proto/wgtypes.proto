@@ -1,0 +1,162 @@
+syntax = "proto3";
+option go_package = "pb/wg";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+package wgtypes;
+
+message Config {
+  // PrivateKey specifies a private key configuration, if not nil.
+  //
+  // A non-nil, zero-value Key will clear the private key.
+  bytes private_key = 1;
+
+  // ListenPort specifies a device's listening port, if not nil.
+  int32 listen_port = 2;
+
+  // FirewallMark specifies a device's firewall mark, if not nil.
+  //
+  // If non-nil and set to 0, the firewall mark will be cleared.
+  int32 firewall_mark = 3;
+
+  // ReplacePeers specifies if the Peers in this configuration should replace
+  // the existing peer list, instead of appending them to the existing list.
+  bool replace_peers = 4;
+
+  // Peers specifies a list of peer configurations to apply to a device.
+  repeated PeerConfig peers = 5;
+}
+
+enum DeviceType {
+  UNKNOWN = 0;
+  LINUX_KERNEL = 1;
+  OPENBSD_KERNET = 2;
+  FREEBSD_KERNEL = 3;
+  WINDOWS_KERNEL = 4;
+  USERSPACE = 5;
+}
+
+message Device {
+  // Name is the name of the device.
+  string name = 1;
+
+  // Type specifies the underlying implementation of the device.
+  DeviceType type = 2;
+
+  // PrivateKey specifies a private key configuration, if not nil.
+  //
+  // A non-nil, zero-value Key will clear the private key.
+  bytes private_key = 3;
+
+  // PublicKey is the device's public key, computed from its PrivateKey.
+  bytes public_key = 4;
+
+  // ListenPort specifies a device's listening port, if not nil.
+  int32 listen_port = 5;
+
+  // FirewallMark specifies a device's firewall mark, if not nil.
+  //
+  // If non-nil and set to 0, the firewall mark will be cleared.
+  int32 firewall_mark = 6;
+
+  // Peers specifies a list of peer configurations to apply to a device.
+  repeated Peer peers = 7;
+}
+
+// PeerConfig is a WireGuard device peer configuration.
+message PeerConfig {
+  // PublicKey specifies the public key of this peer.  PublicKey is a
+  // mandatory field for all PeerConfigs.
+  bytes public_key = 1;
+
+  // Remove specifies if the peer with this public key should be removed
+  // from a device's peer list.
+  bool remove = 2;
+
+  // UpdateOnly specifies that an operation will only occur on this peer
+  // if the peer already exists as part of the interface.
+  bool update_only = 3;
+
+  // PresharedKey specifies a peer's preshared key configuration, if not nil.
+  //
+  // A non-nil, zero-value Key will clear the preshared key.
+  bytes preshared_key = 4;
+
+  // Endpoint specifies the endpoint of this peer entry, if not nil.
+  UDPAddr endpoint = 5;
+
+  // PersistentKeepaliveInterval specifies the persistent keepalive interval
+  // for this peer, if not nil.
+  //
+  // A non-nil value of 0 will clear the persistent keepalive interval.
+  google.protobuf.Duration persistent_keepalive_interval = 6;
+
+  // ReplaceAllowedIPs specifies if the allowed IPs specified in this peer
+  // configuration should replace any existing ones, instead of appending them
+  // to the allowed IPs list.
+  bool replace_allowed_ips = 7;
+
+  // AllowedIPs specifies a list of allowed IP addresses in CIDR notation
+  // for this peer.
+  repeated IPNet allowed_ips = 8;
+}
+
+// Peer is a WireGuard peer to a Device.
+message Peer {
+  // PublicKey is the public key of a peer, computed from its private key.
+  //
+  // PublicKey is always present in a Peer.
+  bytes public_key = 1;
+
+  // PresharedKey is an  preshared key which may be used as an
+  // additional layer of security for peer communications.
+  //
+  // A zero-value Key means no preshared key is configured.
+  bytes preshared_key = 2;
+
+  // Endpoint is the most recent source address used for communication by
+  // this Peer.
+  UDPAddr endpoint = 3;
+
+  // PersistentKeepaliveInterval specifies how often an "empty" packet is sent
+  // to a peer to keep a connection alive.
+  //
+  // A value of 0 indicates that persistent keepalives are disabled.
+  google.protobuf.Duration persistent_keepalive_interval = 4;
+
+  // LastHandshakeTime indicates the most recent time a handshake was performed
+  // with this peer.
+  //
+  // A zero-value time.Time indicates that no handshake has taken place with
+  // this peer.
+  google.protobuf.Timestamp last_handshake_time = 5;
+
+  // ReceiveBytes indicates the number of bytes received from this peer.
+  int64 recieved_bytes = 6;
+
+  // TransmitBytes indicates the number of bytes transmitted to this peer.
+  int64 transmit_bytes = 7;
+
+  // AllowedIPs specifies which IPv4 and IPv6 addresses this peer is allowed
+  // to communicate on.
+  //
+  // 0.0.0.0/0 indicates that all IPv4 addresses are allowed, and ::/0
+  // indicates that all IPv6 addresses are allowed.
+  repeated IPNet allowed_ips = 8;
+
+  // ProtocolVersion specifies which version of the WireGuard protocol is used
+  // for this Peer.
+  //
+  // A value of 0 indicates that the most recent protocol version will be used.
+  int32 protocol_version = 9;
+}
+
+message IPNet {
+  bytes ip = 1;
+  bytes ip_mask = 2;
+}
+
+message UDPAddr {
+  bytes ip = 1;
+  int32 port = 2;
+  string zone = 3;
+}
