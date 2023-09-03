@@ -9,11 +9,11 @@ clean:
 run-server:
 	go run server/main.go
 
-build-linux: gen
-	GOOS=linux GOARCH=amd64 go build  -o wireguard-server-linux server/main.go
+build-linux:
+	GOOS=linux GOARCH=amd64 go build  -o wireguard-grpc-linux server/main.go
 
-build-mac: gen
-	GOOS=darwin GOARCH=amd64 go build  -o wireguard-server-darwin server/main.go
+build-mac:
+	GOOS=darwin GOARCH=amd64 go build  -o wireguard-grpc-darwin server/main.go
 
 mac-install:
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.26
