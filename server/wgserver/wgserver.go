@@ -1,6 +1,7 @@
 package wgserver
 
 import (
+	"io"
 	"log"
 	"net"
 
@@ -13,9 +14,17 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl"
 )
 
+// WGClient represents the wireguard client
+type WGClient interface {
+	io.Closer
+	ConfigureDevice(string, wgtypes.Config) error
+	Device(string) (*wgtypes.Device, error)
+	Devices() ([]*wgtypes.Device, error)
+}
+
 // WGServer keeps data about wireguard server
 type WGServer struct {
-	c *wgctrl.Client
+	c WGClient
 	d *wgtypes.Device
 }
 
@@ -65,8 +74,12 @@ func (wgs WGServer) ConfigureDevice(name string, cfg *pb.Config) error {
 			AllowedIPs:                  allowedIps,
 		})
 	}
+	var privateKey wgtypes.Key
+	if cfg.PrivateKey != nil {
+		privateKey = (wgtypes.Key)(cfg.GetPrivateKey())
+	}
 	wgCfg := wgtypes.Config{
-		PrivateKey:   (*wgtypes.Key)(cfg.GetPrivateKey()),
+		PrivateKey:   &privateKey,
 		ListenPort:   &listenPort,
 		FirewallMark: &fwMark,
 		ReplacePeers: cfg.ReplacePeers,
@@ -87,6 +100,7 @@ func (wgs WGServer) Devices() ([]*pb.Device, error) {
 		pbDev, err := convertWGDeviceToPb(dev)
 		if err != nil {
 			log.Printf("Converting to PB: %s", err)
+			continue
 		}
 		pbDevices = append(pbDevices, pbDev)
 	}
