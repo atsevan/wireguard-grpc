@@ -2,22 +2,29 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"flag"
 	"fmt"
 	"io"
 	"log"
 	"net"
+	"os"
 
 	pb "node/pb/wg"
 	"node/server/wgserver"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/reflection"
 )
 
 var (
-	host = flag.String("host", "localhost", "host to listen to")
-	port = flag.Int("port", 8080, "port to listen to")
+	host     = flag.String("host", "localhost", "host to listen to")
+	port     = flag.Int("port", 8080, "port to listen to")
+	certFile = flag.String("cert", "certs/server.crt", "path to RSA certificate")
+	keyFile  = flag.String("key", "certs/server.key", "path to RSA Private key")
+	caFile   = flag.String("ca", "certs/ca.crt", "path to CA certificate")
 )
 
 // NodeManagerServer is a proto generated server
@@ -71,7 +78,32 @@ func main() {
 	}
 	log.Printf("listen to %s", addr)
 
-	s := grpc.NewServer()
+	// mTLS
+	certificate, err := tls.LoadX509KeyPair(*certFile, *keyFile)
+	if err != nil {
+		log.Fatalf("read RSA key pair: %s", err)
+	}
+	ca, err := os.ReadFile(*caFile)
+	if err != nil {
+		log.Fatalf("read CA certificate: %s", err)
+	}
+
+	// Create a certificate pool and append the client certificates from the CA
+	certPool := x509.NewCertPool()
+	if ok := certPool.AppendCertsFromPEM(ca); !ok {
+		log.Fatalf("failed to append client certs")
+	}
+
+	opts := []grpc.ServerOption{
+		grpc.Creds( // Create the TLS credentials
+			credentials.NewTLS(&tls.Config{
+				ClientAuth:   tls.RequireAndVerifyClientCert,
+				Certificates: []tls.Certificate{certificate},
+				ClientCAs:    certPool,
+			},
+			)),
+	}
+	s := grpc.NewServer(opts...)
 	reflection.Register(s)
 	nms := &NodeManagerServer{
 		wgs: wgs,
