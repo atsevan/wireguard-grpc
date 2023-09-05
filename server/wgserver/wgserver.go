@@ -5,7 +5,7 @@ import (
 	"log"
 	"net"
 
-	pb "node/pb/wg"
+	pb "github.com/atsevan/wireguard-grpc/pb/wg"
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"google.golang.org/protobuf/types/known/durationpb"

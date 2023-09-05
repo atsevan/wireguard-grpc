@@ -11,8 +11,8 @@ import (
 	"net"
 	"os"
 
-	pb "node/pb/wg"
-	"node/server/wgserver"
+	pb "github.com/atsevan/wireguard-grpc/pb/wg"
+	"github.com/atsevan/wireguard-grpc/server/wgserver"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
