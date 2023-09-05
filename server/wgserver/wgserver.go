@@ -4,6 +4,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"os"
 
 	pb "github.com/atsevan/wireguard-grpc/pb/wg"
 
@@ -48,8 +49,12 @@ func (wgs WGServer) Close() error {
 // ConfigureDevice configures a WireGuard device by its interface name.
 //
 // If the device specified by name does not exist or is not a WireGuard device,
-// an error is returned which can be checked using `errors.Is(err, os.ErrNotExist)`.
+// an error is returned which can be checked using `errors.Is(err, os.ErrNotExist)`
+// os.ErrInvalid is returned on invalid input.
 func (wgs WGServer) ConfigureDevice(name string, cfg *pb.Config) error {
+	if cfg == nil || name == "" {
+		return os.ErrInvalid
+	}
 	listenPort := int(cfg.ListenPort)
 	fwMark := int(cfg.FirewallMark)
 	peers := []wgtypes.PeerConfig{}
@@ -112,6 +117,9 @@ func (wgs WGServer) Devices() ([]*pb.Device, error) {
 // If the device specified by name does not exist or is not a WireGuard device,
 // an error is returned which can be checked using `errors.Is(err, os.ErrNotExist)`.
 func (wgs WGServer) Device(name string) (*pb.Device, error) {
+	if name == "" {
+		return &pb.Device{}, os.ErrInvalid
+	}
 	dev, err := wgs.c.Device(name)
 	if err != nil {
 		return &pb.Device{}, err
