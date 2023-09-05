@@ -16,14 +16,16 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 var (
-	host     = flag.String("host", "localhost", "Wireguard GRPC server host")
-	port     = flag.Int("port", 8080, "Wireguard GRPC server port")
-	certFile = flag.String("cert", "certs/client.crt", "path to RSA certificate")
-	keyFile  = flag.String("key", "certs/client.key", "path to RSA Private key")
-	caFile   = flag.String("ca", "certs/ca.crt", "path to CA certificate")
+	host         = flag.String("host", "localhost", "Wireguard GRPC server host")
+	port         = flag.Int("port", 8080, "Wireguard GRPC server port")
+	certFile     = flag.String("cert", "certs/client.crt", "path to RSA certificate")
+	keyFile      = flag.String("key", "certs/client.key", "path to RSA Private key")
+	caFile       = flag.String("ca", "certs/ca.crt", "path to CA certificate")
+	insecureFlag = flag.Bool("insecure", false, "no credentials in use")
 )
 
 func printPeer(p *pb.Peer) {
@@ -68,32 +70,42 @@ func printDevice(d *pb.Device) {
 		d.ListenPort)
 }
 
+func transportCredentialsFromTLS(certPath string, keyPath string, caPath string) (credentials.TransportCredentials, error) {
+	certificate, err := tls.LoadX509KeyPair(*certFile, *keyFile)
+	if err != nil {
+		return nil, fmt.Errorf("read RSA key pair: %s", err)
+	}
+	ca, err := os.ReadFile(caPath)
+	if err != nil {
+		return nil, fmt.Errorf("read CA certificate: %s", err)
+	}
+
+	// Create a certificate pool and append the client certificates from the CA
+	certPool := x509.NewCertPool()
+	if ok := certPool.AppendCertsFromPEM(ca); !ok {
+		return nil, fmt.Errorf("failed to append client certs")
+	}
+	return credentials.NewTLS(&tls.Config{
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		Certificates: []tls.Certificate{certificate},
+		ClientCAs:    certPool,
+	}), nil
+}
+
 func main() {
 
 	flag.Parse()
-
-	// mTLS
-	certificate, err := tls.LoadX509KeyPair(*certFile, *keyFile)
-	if err != nil {
-		log.Fatalf("read RSA key pair: %s", err)
-	}
-	ca, err := os.ReadFile(*caFile)
-	if err != nil {
-		log.Fatalf("read ca certificate: %s", err)
-	}
-
-	// Create a certificate pool with the CA
-	certPool := x509.NewCertPool()
-	if ok := certPool.AppendCertsFromPEM(ca); !ok {
-		log.Fatalf("failed to append ca certs")
+	var err error
+	creds := insecure.NewCredentials()
+	if *insecureFlag != true {
+		creds, err = transportCredentialsFromTLS(*certFile, *keyFile, *caFile)
+		if err != nil {
+			log.Fatalf("trasport credentials from TLS: %s", err)
+		}
 	}
 
 	opts := []grpc.DialOption{
-		grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{
-			ServerName:   *host,
-			Certificates: []tls.Certificate{certificate},
-			RootCAs:      certPool,
-		})),
+		grpc.WithTransportCredentials(creds),
 	}
 
 	ctx, cancelCtx := context.WithTimeout(context.Background(), 5*time.Second)

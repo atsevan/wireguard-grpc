@@ -16,15 +16,17 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 )
 
 var (
-	host     = flag.String("host", "localhost", "host to listen to")
-	port     = flag.Int("port", 8080, "port to listen to")
-	certFile = flag.String("cert", "certs/server.crt", "path to RSA certificate")
-	keyFile  = flag.String("key", "certs/server.key", "path to RSA Private key")
-	caFile   = flag.String("ca", "certs/ca.crt", "path to CA certificate")
+	host         = flag.String("host", "localhost", "host to listen to")
+	port         = flag.Int("port", 8080, "port to listen to")
+	certFile     = flag.String("cert", "certs/server.crt", "path to RSA certificate")
+	keyFile      = flag.String("key", "certs/server.key", "path to RSA Private key")
+	caFile       = flag.String("ca", "certs/ca.crt", "path to CA certificate")
+	insecureFlag = flag.Bool("insecure", false, "no credentials in use")
 )
 
 // NodeManagerServer is a proto generated server
@@ -63,6 +65,28 @@ func (s *NodeManagerServer) Devices(ctx context.Context, in *pb.DevicesRequest) 
 	}, err
 }
 
+func transportCredentialsFromTLS(certPath string, keyPath string, caPath string) (credentials.TransportCredentials, error) {
+	certificate, err := tls.LoadX509KeyPair(*certFile, *keyFile)
+	if err != nil {
+		return nil, fmt.Errorf("read RSA key pair: %s", err)
+	}
+	ca, err := os.ReadFile(caPath)
+	if err != nil {
+		return nil, fmt.Errorf("read CA certificate: %s", err)
+	}
+
+	// Create a certificate pool and append the client certificates from the CA
+	certPool := x509.NewCertPool()
+	if ok := certPool.AppendCertsFromPEM(ca); !ok {
+		return nil, fmt.Errorf("failed to append client certs")
+	}
+	return credentials.NewTLS(&tls.Config{
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		Certificates: []tls.Certificate{certificate},
+		ClientCAs:    certPool,
+	}), nil
+}
+
 func main() {
 	flag.Parse()
 	wgs, err := wgserver.NewWGServer()
@@ -78,30 +102,19 @@ func main() {
 	}
 	log.Printf("listen to %s", addr)
 
-	// mTLS
-	certificate, err := tls.LoadX509KeyPair(*certFile, *keyFile)
-	if err != nil {
-		log.Fatalf("read RSA key pair: %s", err)
-	}
-	ca, err := os.ReadFile(*caFile)
-	if err != nil {
-		log.Fatalf("read CA certificate: %s", err)
-	}
-
-	// Create a certificate pool and append the client certificates from the CA
-	certPool := x509.NewCertPool()
-	if ok := certPool.AppendCertsFromPEM(ca); !ok {
-		log.Fatalf("failed to append client certs")
+	var creds credentials.TransportCredentials
+	if *insecureFlag == true {
+		log.Println("No transport security in use")
+		creds = insecure.NewCredentials()
+	} else {
+		creds, err = transportCredentialsFromTLS(*certFile, *keyFile, *caFile)
+		if err != nil {
+			log.Fatalf("trasport credentials from TLS: %s", err)
+		}
 	}
 
 	opts := []grpc.ServerOption{
-		grpc.Creds( // Create the TLS credentials
-			credentials.NewTLS(&tls.Config{
-				ClientAuth:   tls.RequireAndVerifyClientCert,
-				Certificates: []tls.Certificate{certificate},
-				ClientCAs:    certPool,
-			},
-			)),
+		grpc.Creds(creds),
 	}
 	s := grpc.NewServer(opts...)
 	reflection.Register(s)
