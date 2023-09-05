@@ -60,10 +60,14 @@ func (wgs WGServer) ConfigureDevice(name string, cfg *pb.Config) error {
 	peers := []wgtypes.PeerConfig{}
 	for _, p := range cfg.GetPeers() {
 		keppaliveInterval := p.GetPersistentKeepaliveInterval().AsDuration()
-		endpoint := net.UDPAddr{
-			IP:   net.IP(p.GetEndpoint().GetIp()),
-			Port: int(p.GetEndpoint().GetPort()),
-			Zone: p.GetEndpoint().GetZone(),
+
+		var endpoint net.UDPAddr
+		if p.GetEndpoint() != nil {
+			endpoint = net.UDPAddr{
+				IP:   net.IP(p.GetEndpoint().GetIp()),
+				Port: int(p.GetEndpoint().GetPort()),
+				Zone: p.GetEndpoint().GetZone(),
+			}
 		}
 		allowedIps := []net.IPNet{}
 		for _, ip := range allowedIps {
@@ -72,11 +76,15 @@ func (wgs WGServer) ConfigureDevice(name string, cfg *pb.Config) error {
 				Mask: ip.Mask,
 			})
 		}
+		var presharedKey wgtypes.Key
+		if p.GetPresharedKey() != nil {
+			presharedKey = (wgtypes.Key)(p.GetPresharedKey())
+		}
 		peers = append(peers, wgtypes.PeerConfig{
 			PublicKey:                   wgtypes.Key(p.PublicKey),
 			Remove:                      p.GetRemove(),
 			UpdateOnly:                  p.GetUpdateOnly(),
-			PresharedKey:                (*wgtypes.Key)(p.GetPresharedKey()),
+			PresharedKey:                &presharedKey,
 			Endpoint:                    &endpoint,
 			PersistentKeepaliveInterval: &keppaliveInterval,
 			ReplaceAllowedIPs:           p.GetReplaceAllowedIps(),
