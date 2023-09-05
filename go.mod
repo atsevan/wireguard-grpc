@@ -1,4 +1,4 @@
-module node
+module github.com/atsevan/wireguard-grpc
 
 go 1.20
 

@@ -9,10 +9,11 @@ import (
 	"fmt"
 	"log"
 	"net"
-	pb "node/pb/wg"
 	"os"
 	"strings"
 	"time"
+
+	pb "github.com/atsevan/wireguard-grpc/pb/wg"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -70,7 +71,7 @@ func printDevice(d *pb.Device) {
 		d.ListenPort)
 }
 
-func transportCredentialsFromTLS(certPath string, keyPath string, caPath string) (credentials.TransportCredentials, error) {
+func transportCredentialsFromTLS(certPath string, keyPath string, caPath string, serverName string) (credentials.TransportCredentials, error) {
 	certificate, err := tls.LoadX509KeyPair(*certFile, *keyFile)
 	if err != nil {
 		return nil, fmt.Errorf("read RSA key pair: %s", err)
@@ -86,19 +87,24 @@ func transportCredentialsFromTLS(certPath string, keyPath string, caPath string)
 		return nil, fmt.Errorf("failed to append client certs")
 	}
 	return credentials.NewTLS(&tls.Config{
-		ClientAuth:   tls.RequireAndVerifyClientCert,
+		ServerName:   serverName,
 		Certificates: []tls.Certificate{certificate},
-		ClientCAs:    certPool,
+		RootCAs:      certPool,
 	}), nil
 }
 
 func main() {
 
 	flag.Parse()
+
 	var err error
-	creds := insecure.NewCredentials()
-	if *insecureFlag != true {
-		creds, err = transportCredentialsFromTLS(*certFile, *keyFile, *caFile)
+	var creds credentials.TransportCredentials
+
+	if *insecureFlag == true {
+		log.Println("No transport security in use")
+		creds = insecure.NewCredentials()
+	} else {
+		creds, err = transportCredentialsFromTLS(*certFile, *keyFile, *caFile, *host)
 		if err != nil {
 			log.Fatalf("trasport credentials from TLS: %s", err)
 		}

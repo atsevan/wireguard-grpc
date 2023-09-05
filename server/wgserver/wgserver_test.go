@@ -1,9 +1,10 @@
 package wgserver
 
 import (
-	pb "node/pb/wg"
 	"os"
 	"testing"
+
+	pb "github.com/atsevan/wireguard-grpc/pb/wg"
 
 	"github.com/google/go-cmp/cmp"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
