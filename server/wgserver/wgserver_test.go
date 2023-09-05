@@ -53,33 +53,43 @@ func TestConfigureDevice(t *testing.T) {
 	)
 
 	tests := []struct {
-		name string
-		cfg  *pb.Config
-		fn   func(name string, cfg wgtypes.Config) error
-		err  error
+		name    string
+		cfg     *pb.Config
+		devName string
+		fn      func(name string, cfg wgtypes.Config) error
+		err     error
 	}{
 		{
-			name: "not found",
-			cfg:  emptyCfg,
-			fn:   notExist,
-			err:  os.ErrNotExist,
+			name:    "not found",
+			devName: "wg0",
+			cfg:     cfg,
+			fn:      notExist,
+			err:     os.ErrNotExist,
 		}, {
-			name: "empty cfg ok",
-			cfg:  emptyCfg,
-			fn:   ok,
-			err:  nil,
+			name:    "empty cfg",
+			cfg:     emptyCfg,
+			devName: "wg0",
+			fn:      ok,
+			err:     nil,
 		}, {
-			name: "ok",
-			cfg:  cfg,
-			fn:   ok,
-			err:  nil,
+			name:    "ok",
+			cfg:     cfg,
+			devName: "wg0",
+			fn:      ok,
+			err:     nil,
+		}, {
+			name:    "empty devName",
+			cfg:     cfg,
+			devName: "",
+			fn:      ok,
+			err:     os.ErrInvalid,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			wgs := WGServer{c: &testClient{ConfigureDeviceFunc: tt.fn}}
-			err := wgs.ConfigureDevice("", emptyCfg)
+			err := wgs.ConfigureDevice(tt.devName, emptyCfg)
 			if diff := cmp.Diff(tt.err, err, cmpErrors); diff != "" {
 				t.Fatalf("unexpected error (-want +got):\n%s", diff)
 			}
@@ -180,7 +190,7 @@ func TestDevice(t *testing.T) {
 			name:     "empty name",
 			in:       "",
 			clientFn: clientOkFn,
-			err:      nil,
+			err:      os.ErrInvalid,
 			resp:     &pb.Device{},
 		},
 	}
