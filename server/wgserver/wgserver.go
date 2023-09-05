@@ -52,15 +52,19 @@ func (wgs WGServer) Close() error {
 // an error is returned which can be checked using `errors.Is(err, os.ErrNotExist)`
 // os.ErrInvalid is returned on invalid input.
 func (wgs WGServer) ConfigureDevice(name string, cfg *pb.Config) error {
-	if cfg == nil || name == "" {
+	if name == "" {
 		return os.ErrInvalid
 	}
-	listenPort := int(cfg.ListenPort)
-	fwMark := int(cfg.FirewallMark)
+	listenPort := int(cfg.GetListenPort())
+	fwMark := int(cfg.GetFirewallMark())
 	peers := []wgtypes.PeerConfig{}
-	for _, p := range cfg.Peers {
-		keppaliveInterval := p.PersistentKeepaliveInterval.AsDuration()
-		endpoint := net.UDPAddr{IP: net.IP(p.Endpoint.Ip), Port: int(p.Endpoint.Port), Zone: p.Endpoint.Zone}
+	for _, p := range cfg.GetPeers() {
+		keppaliveInterval := p.GetPersistentKeepaliveInterval().AsDuration()
+		endpoint := net.UDPAddr{
+			IP:   net.IP(p.GetEndpoint().GetIp()),
+			Port: int(p.GetEndpoint().GetPort()),
+			Zone: p.GetEndpoint().GetZone(),
+		}
 		allowedIps := []net.IPNet{}
 		for _, ip := range allowedIps {
 			allowedIps = append(allowedIps, net.IPNet{
@@ -70,12 +74,12 @@ func (wgs WGServer) ConfigureDevice(name string, cfg *pb.Config) error {
 		}
 		peers = append(peers, wgtypes.PeerConfig{
 			PublicKey:                   wgtypes.Key(p.PublicKey),
-			Remove:                      p.Remove,
-			UpdateOnly:                  p.UpdateOnly,
-			PresharedKey:                (*wgtypes.Key)(p.PresharedKey),
+			Remove:                      p.GetRemove(),
+			UpdateOnly:                  p.GetUpdateOnly(),
+			PresharedKey:                (*wgtypes.Key)(p.GetPresharedKey()),
 			Endpoint:                    &endpoint,
 			PersistentKeepaliveInterval: &keppaliveInterval,
-			ReplaceAllowedIPs:           p.ReplaceAllowedIps,
+			ReplaceAllowedIPs:           p.GetReplaceAllowedIps(),
 			AllowedIPs:                  allowedIps,
 		})
 	}
@@ -87,7 +91,7 @@ func (wgs WGServer) ConfigureDevice(name string, cfg *pb.Config) error {
 		PrivateKey:   &privateKey,
 		ListenPort:   &listenPort,
 		FirewallMark: &fwMark,
-		ReplacePeers: cfg.ReplacePeers,
+		ReplacePeers: cfg.GetReplacePeers(),
 		Peers:        peers,
 	}
 
