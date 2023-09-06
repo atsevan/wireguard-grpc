@@ -30,7 +30,6 @@ func NewTestWGSetup(client pb.WireGuardClient, interfaceName string, listenPort 
 		PublicKey:        serverPrivateKey.PublicKey(),
 		listenPort:       listenPort,
 	}, nil
-
 }
 
 // InitWGDevice configure the wireguard device
