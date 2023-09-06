@@ -1,6 +1,7 @@
 package wgserver
 
 import (
+	"net"
 	"os"
 	"testing"
 
@@ -47,6 +48,10 @@ func TestConfigureDevice(t *testing.T) {
 			Peers: []*pb.PeerConfig{
 				{
 					PublicKey: []byte("PublicKey"),
+					AllowedIps: []*pb.IPNet{{
+						Ip:     []byte{192, 168, 2, 2},
+						IpMask: []byte{255, 255, 255, 255},
+					}},
 				},
 			},
 		}
@@ -56,39 +61,39 @@ func TestConfigureDevice(t *testing.T) {
 		name    string
 		cfg     *pb.Config
 		devName string
-		fn      func(name string, cfg wgtypes.Config) error
+		wgFn    func(name string, cfg wgtypes.Config) error
 		err     error
 	}{
 		{
 			name:    "not found",
 			devName: "wg0",
 			cfg:     cfg,
-			fn:      notExist,
+			wgFn:    notExist,
 			err:     os.ErrNotExist,
 		}, {
 			name:    "empty cfg",
 			cfg:     emptyCfg,
 			devName: "wg0",
-			fn:      ok,
+			wgFn:    ok,
 			err:     nil,
 		}, {
 			name:    "ok",
 			cfg:     cfg,
 			devName: "wg0",
-			fn:      ok,
+			wgFn:    ok,
 			err:     nil,
 		}, {
 			name:    "empty devName",
 			cfg:     cfg,
 			devName: "",
-			fn:      ok,
+			wgFn:    ok,
 			err:     os.ErrInvalid,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			wgs := WGServer{c: &testClient{ConfigureDeviceFunc: tt.fn}}
+			wgs := WGServer{c: &testClient{ConfigureDeviceFunc: tt.wgFn}}
 			err := wgs.ConfigureDevice(tt.devName, emptyCfg)
 			if diff := cmp.Diff(tt.err, err, cmpErrors); diff != "" {
 				t.Fatalf("unexpected error (-want +got):\n%s", diff)
@@ -210,6 +215,10 @@ func TestDevice(t *testing.T) {
 }
 
 func TestConvertWGDeviceToPb(t *testing.T) {
+
+	testKey, _ := wgtypes.GeneratePrivateKey()
+	pubKey := testKey.PublicKey()
+	_, ipNet, _ := net.ParseCIDR("192.168.2.2/24")
 	tests := []struct {
 		name   string
 		devIn  *wgtypes.Device
@@ -223,7 +232,7 @@ func TestConvertWGDeviceToPb(t *testing.T) {
 			err:    nil,
 		},
 		{
-			name: "OK device",
+			name: "OK device withou peers",
 			devIn: &wgtypes.Device{
 				Name:         "wg0",
 				Type:         wgtypes.FreeBSDKernel,
@@ -244,6 +253,31 @@ func TestConvertWGDeviceToPb(t *testing.T) {
 			},
 			err: nil,
 		},
+		{
+			name: "OK device with peers",
+			devIn: &wgtypes.Device{
+				Name:       "wg0",
+				PrivateKey: wgtypes.Key{},
+				Peers: []wgtypes.Peer{
+					{
+						PublicKey:  pubKey,
+						AllowedIPs: []net.IPNet{*ipNet},
+					},
+				},
+			},
+			devOut: &pb.Device{
+				Name:       "wg0",
+				PrivateKey: []byte{},
+				Peers: []*pb.Peer{{
+					PublicKey: pubKey[:],
+					AllowedIps: []*pb.IPNet{{
+						Ip:     ipNet.IP,
+						IpMask: ipNet.Mask,
+					}},
+				}},
+			},
+			err: nil,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -254,6 +288,10 @@ func TestConvertWGDeviceToPb(t *testing.T) {
 			if diff := cmp.Diff(tt.devOut.Name, resp.Name); diff != "" {
 				t.Fatalf("unexpected name of devices (-want +got):\n%s", diff)
 			}
+			if diff := cmp.Diff(len(tt.devOut.Peers), len(resp.Peers)); diff != "" {
+				t.Fatalf("unexpected number of peers (-want +got):\n%s", diff)
+			}
+
 		})
 	}
 }

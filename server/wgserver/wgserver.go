@@ -55,8 +55,10 @@ func (wgs WGServer) ConfigureDevice(name string, cfg *pb.Config) error {
 	if name == "" {
 		return os.ErrInvalid
 	}
+
 	listenPort := int(cfg.GetListenPort())
 	fwMark := int(cfg.GetFirewallMark())
+
 	peers := []wgtypes.PeerConfig{}
 	for _, p := range cfg.GetPeers() {
 		keppaliveInterval := p.GetPersistentKeepaliveInterval().AsDuration()
@@ -70,10 +72,10 @@ func (wgs WGServer) ConfigureDevice(name string, cfg *pb.Config) error {
 			}
 		}
 		allowedIps := []net.IPNet{}
-		for _, ip := range allowedIps {
+		for _, ip := range p.AllowedIps {
 			allowedIps = append(allowedIps, net.IPNet{
-				IP:   ip.IP,
-				Mask: ip.Mask,
+				IP:   ip.GetIp(),
+				Mask: ip.GetIpMask(),
 			})
 		}
 		var presharedKey wgtypes.Key
