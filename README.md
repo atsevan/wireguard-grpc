@@ -40,26 +40,3 @@ service WireGuard {
   rpc Devices ( .DevicesRequest ) returns ( .DevicesResponse );
 }
 ```
-
-
-# WIP: GCP free-tier instance test
-```
-# create an instance
-gcloud compute instances create vpn-test-instance-1 --machine-type=e2-micro --zone=us-east1-c
-
-# enable ip_forwarding and setup a wg interface
-gcloud compute ssh vpn-test-instance-1 --zone=us-east1-c \
-    --command="sudo sysctl 'net.ipv4.ip_forward=1'; sudo ip link add dev wg0 type wireguard; sudo ip link set up dev wg0" 
-
-
-# download and run *insecure* wireguard-grpc with port-frowarding to localhost for grpc and wireguard
-gcloud compute ssh vpn-test-instance-1 --zone=us-east1-c \
-    --ssh-flag="-vv" --ssh-flag="-L 8080:localhost:8080 -L 51820:localhost:51820" \
-    --command="wget https://github.com/atsevan/wireguard-grpc/releases/download/v0.0.1/wireguard-grpc-linux && chmod +x wireguard-grpc-linux && sudo ./wireguard-grpc-linux -insecure"
-
-## open a new terminal
-go run client/main.go -configuredevice -insecure
-
-# destroy the instance
-gcloud compute instances delete vpn-test-instance-1 --zone=us-east1-c --quiet
-```

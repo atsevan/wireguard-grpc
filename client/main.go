@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/atsevan/wireguard-grpc/client/testsetup"
 	pb "github.com/atsevan/wireguard-grpc/pb/wg"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 
@@ -28,7 +29,7 @@ var (
 	keyFile      = flag.String("key", "certs/client.key", "path to RSA Private key")
 	caFile       = flag.String("ca", "certs/ca.crt", "path to CA certificate")
 	insecureFlag = flag.Bool("insecure", false, "no credentials in use")
-	confDevice   = flag.Bool("configuredevice", false, "configure 'wg0' device")
+	confDevice   = flag.Bool("configuretest", false, "configure 'wg0' device and add a peer")
 )
 
 const (
@@ -48,12 +49,12 @@ const (
 	peerConfigTmpl = `
   [Interface]
   PrivateKey = %s
-  Address = 192.168.2.2/16
+  Address = %s/24
 
   [Peer]
   PublicKey = %s
   AllowedIPs = 0.0.0.0/0, ::/0
-  Endpoint = localhost:51820
+  Endpoint = %s:%d
   `
 )
 
@@ -87,8 +88,9 @@ func printDevice(d *pb.Device) {
 		d.ListenPort)
 }
 
+// transportCredentialsFromTLS creates TransportCredentials based on TLS certificate
 func transportCredentialsFromTLS(certPath string, keyPath string, caPath string, serverName string) (credentials.TransportCredentials, error) {
-	certificate, err := tls.LoadX509KeyPair(*certFile, *keyFile)
+	certificate, err := tls.LoadX509KeyPair(certPath, keyPath)
 	if err != nil {
 		return nil, fmt.Errorf("read RSA key pair: %s", err)
 	}
@@ -107,61 +109,6 @@ func transportCredentialsFromTLS(certPath string, keyPath string, caPath string,
 		Certificates: []tls.Certificate{certificate},
 		RootCAs:      certPool,
 	}), nil
-}
-
-func printDevices(ctx context.Context, client pb.WireGuardClient) {
-	devices, err := client.Devices(ctx, &pb.DevicesRequest{})
-	if err != nil {
-		log.Fatalf("get devices: %v", err)
-	}
-	for _, dev := range devices.Devices {
-		printDevice(dev)
-		for _, peer := range dev.Peers {
-			printPeer(peer)
-		}
-	}
-}
-
-// configureDeviceWithTestPeer is an example how to configure Wireguard device with a Peer
-func configureDeviceWithTestPeer(ctx context.Context, client pb.WireGuardClient) (*wgtypes.Key, error) {
-
-	peerIP := []byte{192, 168, 2, 2}
-	peerMask := []byte{255, 255, 255, 255}
-	listenPort := int32(51820)
-
-	privServerKey, err := wgtypes.GeneratePrivateKey()
-	if err != nil {
-		return nil, fmt.Errorf("generate private key: %s", err)
-	}
-	privPeerKey, err := wgtypes.GeneratePrivateKey()
-	if err != nil {
-		return nil, fmt.Errorf("generate private key: %s", err)
-	}
-	publicPeerKey := privPeerKey.PublicKey()
-
-	log.Printf("Adding peer %s with %s", privPeerKey.PublicKey().String(), peerIP)
-
-	_, err = client.ConfigureDevice(ctx, &pb.ConfigureDeviceRequest{
-		Name: "wg0",
-		Config: &pb.Config{
-			PrivateKey: privServerKey[:],
-			ListenPort: listenPort,
-			Peers: []*pb.PeerConfig{
-				{
-					PublicKey: publicPeerKey[:],
-					AllowedIps: []*pb.IPNet{{
-						Ip:     peerIP,
-						IpMask: peerMask,
-					}},
-					Endpoint: &pb.UDPAddr{
-						Ip:   peerIP,
-						Port: 0,
-					},
-				},
-			},
-		},
-	})
-	return &privPeerKey, err
 }
 
 func main() {
@@ -197,19 +144,64 @@ func main() {
 	client := pb.NewWireGuardClient(conn)
 
 	if *confDevice == true {
-		peerPrivateKey, err := configureDeviceWithTestPeer(ctx, client)
+		ip := net.ParseIP("192.168.2.2")
+		devName := "wg0"
+		listenPort := int32(51820)
+
+		wgSetup, err := testsetup.NewTestWGSetup(client, devName, listenPort)
 		if err != nil {
-			log.Fatalf("configure device: %s", err)
+			log.Fatalf("create Wireguard setup: %v", err)
+		}
+
+		err = wgSetup.InitWGDevice(ctx)
+		if err != nil {
+			log.Fatalf("create Wireguard setup: %v", err)
+		}
+
+		peerPrivateKey, err := wgtypes.GeneratePrivateKey()
+		if err != nil {
+			log.Fatalf("generate peer key: %v", err)
+		}
+		peerPublicKey := peerPrivateKey.PublicKey()
+
+		peer := &pb.PeerConfig{
+			PublicKey: peerPublicKey[:],
+			AllowedIps: []*pb.IPNet{
+				{
+					Ip:     ip,
+					IpMask: net.CIDRMask(32, 32), // /32 mask
+				},
+			},
+			Endpoint: &pb.UDPAddr{ // supressing `wglinux: invalid endpoint IP: <nil>`
+				Ip: ip,
+			},
+		}
+		err = wgSetup.AddPeer(ctx, peer)
+		if err != nil {
+			log.Fatalf("add peer: %s", err)
 		}
 
 		fmt.Printf(
 			peerConfigTmpl,
-			peerPrivateKey.String(),
-			peerPrivateKey.PublicKey().String(),
+			peerPrivateKey,
+			ip,
+			wgSetup.PublicKey,
+			*host,
+			listenPort,
 		)
 	}
 
-	printDevices(ctx, client)
+	// print peers from all devices
+	devices, err := client.Devices(ctx, &pb.DevicesRequest{})
+	if err != nil {
+		log.Fatalf("get devices: %v", err)
+	}
+	for _, dev := range devices.Devices {
+		printDevice(dev)
+		for _, peer := range dev.Peers {
+			printPeer(peer)
+		}
+	}
 
 	log.Println("done")
 }
