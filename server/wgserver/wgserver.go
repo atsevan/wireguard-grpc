@@ -46,6 +46,24 @@ func (wgs WGServer) Close() error {
 	return wgs.c.Close()
 }
 
+func pb2UDPAddr(pbUDP *pb.UDPAddr) *net.UDPAddr {
+	if pbUDP == nil {
+		return nil
+	}
+	return &net.UDPAddr{
+		IP:   net.IP(pbUDP.GetIp()),
+		Port: int(pbUDP.GetPort()),
+		Zone: pbUDP.GetZone(),
+	}
+}
+
+func pbKey2wgKey(key []byte) *wgtypes.Key {
+	if key == nil {
+		return nil
+	}
+	return (*wgtypes.Key)(key)
+}
+
 // ConfigureDevice configures a WireGuard device by its interface name.
 //
 // If the device specified by name does not exist or is not a WireGuard device,
@@ -63,14 +81,6 @@ func (wgs WGServer) ConfigureDevice(name string, cfg *pb.Config) error {
 	for _, p := range cfg.GetPeers() {
 		keppaliveInterval := p.GetPersistentKeepaliveInterval().AsDuration()
 
-		var endpoint net.UDPAddr
-		if p.GetEndpoint() != nil {
-			endpoint = net.UDPAddr{
-				IP:   net.IP(p.GetEndpoint().GetIp()),
-				Port: int(p.GetEndpoint().GetPort()),
-				Zone: p.GetEndpoint().GetZone(),
-			}
-		}
 		allowedIps := []net.IPNet{}
 		for _, ip := range p.AllowedIps {
 			allowedIps = append(allowedIps, net.IPNet{
@@ -78,27 +88,19 @@ func (wgs WGServer) ConfigureDevice(name string, cfg *pb.Config) error {
 				Mask: ip.GetIpMask(),
 			})
 		}
-		var presharedKey wgtypes.Key
-		if p.GetPresharedKey() != nil {
-			presharedKey = (wgtypes.Key)(p.GetPresharedKey())
-		}
 		peers = append(peers, wgtypes.PeerConfig{
-			PublicKey:                   wgtypes.Key(p.PublicKey),
+			PublicKey:                   *pbKey2wgKey(p.PublicKey),
 			Remove:                      p.GetRemove(),
 			UpdateOnly:                  p.GetUpdateOnly(),
-			PresharedKey:                &presharedKey,
-			Endpoint:                    &endpoint,
+			PresharedKey:                pbKey2wgKey(p.PresharedKey),
+			Endpoint:                    pb2UDPAddr(p.Endpoint),
 			PersistentKeepaliveInterval: &keppaliveInterval,
 			ReplaceAllowedIPs:           p.GetReplaceAllowedIps(),
 			AllowedIPs:                  allowedIps,
 		})
 	}
-	var privateKey wgtypes.Key
-	if cfg.PrivateKey != nil {
-		privateKey = (wgtypes.Key)(cfg.GetPrivateKey())
-	}
 	wgCfg := wgtypes.Config{
-		PrivateKey:   &privateKey,
+		PrivateKey:   pbKey2wgKey(cfg.PrivateKey),
 		ListenPort:   &listenPort,
 		FirewallMark: &fwMark,
 		ReplacePeers: cfg.GetReplacePeers(),

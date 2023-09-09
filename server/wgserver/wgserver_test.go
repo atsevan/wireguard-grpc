@@ -41,13 +41,16 @@ func TestConfigureDevice(t *testing.T) {
 		}
 		emptyCfg = &pb.Config{}
 
+		privateKey, _ = wgtypes.GenerateKey()
+		publicKey     = privateKey.PublicKey()
+
 		cfg = &pb.Config{
-			PrivateKey:   []byte("PrivateKey"),
+			PrivateKey:   privateKey[:],
 			ListenPort:   8080,
 			ReplacePeers: true,
 			Peers: []*pb.PeerConfig{
 				{
-					PublicKey: []byte("PublicKey"),
+					PublicKey: publicKey[:],
 					AllowedIps: []*pb.IPNet{{
 						Ip:     []byte{192, 168, 2, 2},
 						IpMask: []byte{255, 255, 255, 255},
@@ -94,7 +97,7 @@ func TestConfigureDevice(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			wgs := WGServer{c: &testClient{ConfigureDeviceFunc: tt.wgFn}}
-			err := wgs.ConfigureDevice(tt.devName, emptyCfg)
+			err := wgs.ConfigureDevice(tt.devName, tt.cfg)
 			if diff := cmp.Diff(tt.err, err, cmpErrors); diff != "" {
 				t.Fatalf("unexpected error (-want +got):\n%s", diff)
 			}
