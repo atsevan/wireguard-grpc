@@ -172,9 +172,7 @@ func main() {
 					IpMask: net.CIDRMask(32, 32), // /32 mask
 				},
 			},
-			Endpoint: &pb.UDPAddr{ // supressing `wglinux: invalid endpoint IP: <nil>`
-				Ip: ip,
-			},
+			ReplaceAllowedIps: true,
 		}
 		err = wgSetup.AddPeer(ctx, peer)
 		if err != nil {

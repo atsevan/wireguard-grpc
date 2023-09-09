@@ -57,10 +57,9 @@ func (s *TestWGSetup) AddPeer(ctx context.Context, peer *pb.PeerConfig) error {
 	_, err := s.client.ConfigureDevice(ctx, &pb.ConfigureDeviceRequest{
 		Name: s.interfaceName,
 		Config: &pb.Config{
-			PrivateKey:   s.serverPrivateKey[:],
-			ListenPort:   s.listenPort,
-			Peers:        []*pb.PeerConfig{peer},
-			ReplacePeers: true,
+			PrivateKey: s.serverPrivateKey[:],
+			ListenPort: s.listenPort,
+			Peers:      []*pb.PeerConfig{peer},
 		},
 	})
 	return err
