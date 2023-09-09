@@ -40,25 +40,30 @@ const (
 	transfer: %d B received, %d B sent
 
   `
-	deviceTmpl = `interface: %s (%s)
+	deviceTmpl = `
+  interface: %s (%s)
   public key: %s
   private key: (hidden)
   listening port: %d
 
   `
 	peerConfigTmpl = `
-  [Interface]
-  PrivateKey = %s
-  Address = %s/24
+## BEGIN(Client configugration)
 
-  [Peer]
-  PublicKey = %s
-  AllowedIPs = 0.0.0.0/0, ::/0
-  Endpoint = %s:%d
-  `
+[Interface]
+PrivateKey = %s
+Address = %s/24
+
+[Peer]
+PublicKey = %s
+AllowedIPs = 0.0.0.0/0, ::/0
+Endpoint = %s:%d
+
+## END(Client configuration)
+`
 )
 
-func printPeer(p *pb.Peer) {
+func stringPeer(p *pb.Peer) string {
 	endpoint := net.UDPAddr{
 		IP:   p.Endpoint.GetIp(),
 		Port: (int)(p.Endpoint.GetPort()),
@@ -68,7 +73,7 @@ func printPeer(p *pb.Peer) {
 		ip := net.IPNet{IP: ipn.GetIp(), Mask: ipn.GetIpMask()}
 		allowedIPs = append(allowedIPs, ip.String())
 	}
-	fmt.Printf(
+	return fmt.Sprintf(
 		peerTmpl,
 		base64.StdEncoding.EncodeToString(p.GetPublicKey()),
 		endpoint.String(),
@@ -77,15 +82,6 @@ func printPeer(p *pb.Peer) {
 		p.RecievedBytes,
 		p.TransmitBytes,
 	)
-}
-
-func printDevice(d *pb.Device) {
-	fmt.Printf(
-		deviceTmpl,
-		d.Name,
-		d.Type.String(),
-		base64.StdEncoding.EncodeToString(d.GetPublicKey()),
-		d.ListenPort)
 }
 
 // transportCredentialsFromTLS creates TransportCredentials based on TLS certificate
@@ -112,7 +108,6 @@ func transportCredentialsFromTLS(certPath string, keyPath string, caPath string,
 }
 
 func main() {
-
 	flag.Parse()
 
 	var err error
@@ -179,6 +174,7 @@ func main() {
 			log.Fatalf("add peer: %s", err)
 		}
 
+		log.Println("New peer has been added")
 		fmt.Printf(
 			peerConfigTmpl,
 			peerPrivateKey,
@@ -187,17 +183,42 @@ func main() {
 			*host,
 			listenPort,
 		)
+		fmt.Println()
+
 	}
 
-	// print peers from all devices
+	log.Println("Wireguard configuration")
 	devices, err := client.Devices(ctx, &pb.DevicesRequest{})
 	if err != nil {
 		log.Fatalf("get devices: %v", err)
 	}
 	for _, dev := range devices.Devices {
-		printDevice(dev)
+		fmt.Printf(
+			deviceTmpl,
+			dev.Name,
+			dev.Type,
+			base64.StdEncoding.EncodeToString(dev.GetPublicKey()),
+			dev.ListenPort)
+
 		for _, peer := range dev.Peers {
-			printPeer(peer)
+			endpoint := &net.UDPAddr{
+				IP:   peer.Endpoint.GetIp(),
+				Port: (int)(peer.Endpoint.GetPort()),
+			}
+			allowedIPs := make([]string, 0, len(peer.AllowedIps))
+			for _, ipn := range peer.AllowedIps {
+				ip := net.IPNet{IP: ipn.GetIp(), Mask: ipn.GetIpMask()}
+				allowedIPs = append(allowedIPs, ip.String())
+			}
+			fmt.Printf(
+				peerTmpl,
+				base64.StdEncoding.EncodeToString(peer.GetPublicKey()),
+				endpoint,
+				strings.Join(allowedIPs, ", "),
+				peer.LastHandshakeTime.AsTime(),
+				peer.RecievedBytes,
+				peer.TransmitBytes,
+			)
 		}
 	}
 

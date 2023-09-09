@@ -44,9 +44,10 @@ func (s *TestWGSetup) InitWGDevice(ctx context.Context) error {
 	_, err := s.client.ConfigureDevice(ctx, &pb.ConfigureDeviceRequest{
 		Name: s.interfaceName,
 		Config: &pb.Config{
-			PrivateKey: s.serverPrivateKey[:],
-			ListenPort: s.listenPort,
-			Peers:      []*pb.PeerConfig{},
+			PrivateKey:   s.serverPrivateKey[:],
+			ListenPort:   s.listenPort,
+			Peers:        []*pb.PeerConfig{},
+			ReplacePeers: true,
 		},
 	})
 	return err
