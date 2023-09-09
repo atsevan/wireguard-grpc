@@ -36,9 +36,6 @@ gcloud compute ssh vpn-test-instance-1 --zone=us-east1-c \
         && sudo ./wireguard-grpc-linux -insecure"
 
 ## open a new terminal
-
-gcloud compute instances describe vpn-test-instance-1  --format='get(networkInterfaces[0].accessConfigs[0].natIP)'  --zone=us-east1-c
-
 # configure the wireguard device and create a test user
 go run client/main.go -configuretest -insecure
 
