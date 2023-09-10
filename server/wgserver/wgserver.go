@@ -148,18 +148,28 @@ func (wgs WGServer) Device(name string) (*pb.Device, error) {
 	return pbDevice, nil
 }
 
+func udpAddr2Pb(udpAddr *net.UDPAddr) *pb.UDPAddr {
+	if udpAddr == nil {
+		return nil
+	}
+	return &pb.UDPAddr{
+		Ip:   []byte(udpAddr.IP),
+		Port: int32(udpAddr.Port),
+		Zone: udpAddr.Zone,
+	}
+}
+
+func wgKey2pbKey(key *wgtypes.Key) []byte {
+	if key == nil {
+		return nil
+	}
+	return key[:]
+}
+
 // convertWGDeviceToPb converts wgtypes.Device into pb.Device
 func convertWGDeviceToPb(dev *wgtypes.Device) (*pb.Device, error) {
 	peers := []*pb.Peer{}
 	for _, p := range dev.Peers {
-		endpoint := &pb.UDPAddr{}
-		if p.Endpoint != nil {
-			endpoint = &pb.UDPAddr{
-				Ip:   []byte(p.Endpoint.IP),
-				Port: int32(p.Endpoint.AddrPort().Port()),
-				Zone: p.Endpoint.Zone,
-			}
-		}
 		allowedIPs := []*pb.IPNet{}
 		for _, ip := range p.AllowedIPs {
 			allowedIPs = append(allowedIPs, &pb.IPNet{
@@ -169,9 +179,9 @@ func convertWGDeviceToPb(dev *wgtypes.Device) (*pb.Device, error) {
 		}
 		protoVersion := int32(p.ProtocolVersion)
 		peers = append(peers, &pb.Peer{
-			PublicKey:                   p.PublicKey[:],
-			PresharedKey:                p.PresharedKey[:],
-			Endpoint:                    endpoint,
+			PublicKey:                   wgKey2pbKey(&p.PublicKey),
+			PresharedKey:                wgKey2pbKey(&p.PresharedKey),
+			Endpoint:                    udpAddr2Pb(p.Endpoint),
 			PersistentKeepaliveInterval: durationpb.New(p.PersistentKeepaliveInterval),
 			LastHandshakeTime:           timestamppb.New(p.LastHandshakeTime),
 			RecievedBytes:               p.ReceiveBytes,
@@ -183,8 +193,8 @@ func convertWGDeviceToPb(dev *wgtypes.Device) (*pb.Device, error) {
 	return &pb.Device{
 		Name:         dev.Name,
 		Type:         pb.DeviceType(dev.Type),
-		PrivateKey:   dev.PrivateKey[:],
-		PublicKey:    dev.PublicKey[:],
+		PrivateKey:   wgKey2pbKey(&dev.PrivateKey),
+		PublicKey:    wgKey2pbKey(&dev.PublicKey),
 		ListenPort:   int32(dev.ListenPort),
 		FirewallMark: int32(dev.FirewallMark),
 		Peers:        peers,
