@@ -222,5 +222,5 @@ func main() {
 		}
 	}
 
-	log.Println("done")
+	log.Println("Done")
 }

@@ -40,10 +40,10 @@ run-server:
 	go run server/main.go
 
 build-linux:
-	GOOS=linux GOARCH=amd64 go build  -o wireguard-grpc-linux server/main.go
+	GOOS=linux go build -o wireguard-grpc-linux server/main.go
 
 build:
-	go build  -o wireguard-grpc server/main.go
+	go build -o wireguard-grpc server/main.go
 
 mac-install:
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.26
@@ -63,3 +63,6 @@ test:
 tidy:
 	go fmt ./...
 	go mod tidy -v
+
+build-docker:
+	docker build . --tag wireguard-grpc --tag atsevan/wireguard-grpc

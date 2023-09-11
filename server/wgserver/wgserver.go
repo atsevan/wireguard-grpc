@@ -34,7 +34,6 @@ func NewWGServer() (WGServer, error) {
 	wgs := &WGServer{}
 	c, err := wgctrl.New()
 	if err != nil {
-		log.Printf("WGServer.NewWGServer: %s", err)
 		return *wgs, err
 	}
 	wgs.c = c
