@@ -40,3 +40,16 @@ service WireGuard {
   rpc Devices ( .DevicesRequest ) returns ( .DevicesResponse );
 }
 ```
+
+# Docker
+## Build a docker image
+```
+$ make build-docker
+```
+## Run
+
+`docker run` requires NET_ADMIN docker capability
+
+```
+$ make docker-run  # run w/ -insecure
+```

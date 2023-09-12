@@ -16,8 +16,11 @@ RUN CGO_ENABLED=0 go build -o wireguard-grpc server/main.go
 FROM debian:stable-slim
 
 COPY --from=build_base /app/wireguard-grpc /wireguard-grpc
+COPY --from=build_base /app/docker-entrypoint.sh /
+
+RUN apt update; apt install iproute2 -y
 
 # This container exposes port 8080 to the outside world
 EXPOSE 8080
 
-ENTRYPOINT ["/wireguard-grpc"]
+ENTRYPOINT ["/docker-entrypoint.sh"]

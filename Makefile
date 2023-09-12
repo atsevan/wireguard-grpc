@@ -42,7 +42,7 @@ run-server:
 build-linux:
 	GOOS=linux go build -o wireguard-grpc-linux server/main.go
 
-build:
+build: tidy
 	go build -o wireguard-grpc server/main.go
 
 mac-install:
@@ -64,5 +64,9 @@ tidy:
 	go fmt ./...
 	go mod tidy -v
 
-build-docker:
+docker-build: test
 	docker build . --tag wireguard-grpc --tag atsevan/wireguard-grpc
+
+docker-run:
+	docker run -it --cap-add=NET_ADMIN docker.io/atsevan/wireguard-grpc --insecure --host 0.0.0.0
+
