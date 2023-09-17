@@ -69,4 +69,3 @@ docker-build: test
 
 docker-run:
 	docker run -it --cap-add=NET_ADMIN docker.io/atsevan/wireguard-grpc --insecure --host 0.0.0.0
-

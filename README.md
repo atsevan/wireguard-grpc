@@ -1,5 +1,7 @@
 # Wireguard gRPC Service 
 
+![Wireguard-grpc logo](img/logo.png)
+
 Wireguard gRPC aimed at managing Wireguard configurations. 
 The service gives a control over Wireguard setup via gRPC using native client without parsing output of wireguard-tools like `wg` and `wg-quick`.
 
@@ -61,7 +63,7 @@ $ grpcurl -plaintext -d @ localhost:8080 WireGuard/ConfigureDevice <<EOM
 {
       "name": "wg0",
       "config": {
-      "privateKey": "$(wg genkey)",      
+      "privateKey": "$(wg genkey)",
       "listenPort": 51820,
       "peers": [
         {
@@ -70,7 +72,7 @@ $ grpcurl -plaintext -d @ localhost:8080 WireGuard/ConfigureDevice <<EOM
           "allowedIps": [
             {
               "ip": "CgcADg==",
-              "ipMask": "/////w==" 
+              "ipMask": "/////w=="
             }
           ]
         }
@@ -107,8 +109,8 @@ $ grpcurl -plaintext localhost:8080 WireGuard/Devices
   ]
 }
 ```
-
-Convert bytes encoded with base64 to string and vice versa
+### Note about types
+ip, ip_mask, keys are stored in bytes and encoded with base64. Those can be converted to string and vice versa by a python oneliner
 ```
 $ python -c "import base64; print(base64.b64encode(bytearray([int(x) for x in '10.7.0.14'.split('.')])))"
 b'CgcADg=='
