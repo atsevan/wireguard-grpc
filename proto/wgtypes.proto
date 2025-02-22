@@ -4,6 +4,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 package wgtypes;
 
+
 message Config {
   // PrivateKey specifies a private key configuration, if not nil.
   //

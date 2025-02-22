@@ -66,7 +66,7 @@ func (s *NodeManagerServer) Devices(ctx context.Context, in *pb.DevicesRequest) 
 }
 
 func transportCredentialsFromTLS(certPath string, keyPath string, caPath string) (credentials.TransportCredentials, error) {
-	certificate, err := tls.LoadX509KeyPair(*certFile, *keyFile)
+	certificate, err := tls.LoadX509KeyPair(certPath, keyPath)
 	if err != nil {
 		return nil, fmt.Errorf("read RSA key pair: %s", err)
 	}
