@@ -210,6 +210,9 @@ func TestDevice(t *testing.T) {
 			if diff := cmp.Diff(tt.err, err, cmpErrors); diff != "" {
 				t.Fatalf("unexpected error (-want +got):\n%s", diff)
 			}
+			if err != nil {
+				return
+			}
 			if diff := cmp.Diff(resp.Name, tt.resp.Name); diff != "" {
 				t.Fatalf("unexpected name of devices (-want +got):\n%s", diff)
 			}
@@ -295,6 +298,55 @@ func TestConvertWGDeviceToPb(t *testing.T) {
 				t.Fatalf("unexpected number of peers (-want +got):\n%s", diff)
 			}
 
+		})
+	}
+}
+
+func TestPb2UDPAddr(t *testing.T) {
+	tests := []struct {
+		name string
+		in   *pb.UDPAddr
+		want *net.UDPAddr
+	}{
+		{
+			name: "nil input",
+			in:   nil,
+			want: nil,
+		},
+		{
+			name: "valid input",
+			in: &pb.UDPAddr{
+				Ip:   []byte{192, 168, 1, 1},
+				Port: 51820,
+				Zone: "eth0",
+			},
+			want: &net.UDPAddr{
+				IP:   net.IP{192, 168, 1, 1},
+				Port: 51820,
+				Zone: "eth0",
+			},
+		},
+		{
+			name: "IPv6 input",
+			in: &pb.UDPAddr{
+				Ip:   []byte{0x20, 0x01, 0x0d, 0xb8, 0x85, 0xa3, 0x00, 0x00, 0x00, 0x00, 0x8a, 0x2e, 0x03, 0x70, 0x73, 0x34},
+				Port: 51821,
+				Zone: "eth1",
+			},
+			want: &net.UDPAddr{
+				IP:   net.IP{0x20, 0x01, 0x0d, 0xb8, 0x85, 0xa3, 0x00, 0x00, 0x00, 0x00, 0x8a, 0x2e, 0x03, 0x70, 0x73, 0x34},
+				Port: 51821,
+				Zone: "eth1",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := pb2UDPAddr(tt.in)
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("pb2UDPAddr() mismatch (-want +got):\n%s", diff)
+			}
 		})
 	}
 }

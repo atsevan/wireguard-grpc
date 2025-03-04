@@ -68,11 +68,11 @@ func (s *NodeManagerServer) Devices(ctx context.Context, in *pb.DevicesRequest) 
 func transportCredentialsFromTLS(certPath string, keyPath string, caPath string) (credentials.TransportCredentials, error) {
 	certificate, err := tls.LoadX509KeyPair(certPath, keyPath)
 	if err != nil {
-		return nil, fmt.Errorf("read RSA key pair: %s", err)
+		return nil, fmt.Errorf("read RSA key pair: %w", err)
 	}
 	ca, err := os.ReadFile(caPath)
 	if err != nil {
-		return nil, fmt.Errorf("read CA certificate: %s", err)
+		return nil, fmt.Errorf("read CA certificate: %w", err)
 	}
 
 	// Create a certificate pool and append the client certificates from the CA
@@ -103,13 +103,13 @@ func main() {
 	log.Printf("listen to %s", addr)
 
 	var creds credentials.TransportCredentials
-	if *insecureFlag == true {
+	if *insecureFlag {
 		log.Println("No transport security in use")
 		creds = insecure.NewCredentials()
 	} else {
 		creds, err = transportCredentialsFromTLS(*certFile, *keyFile, *caFile)
 		if err != nil {
-			log.Fatalf("trasport credentials from TLS: %s", err)
+			log.Fatalf("transport credentials from TLS: %s", err)
 		}
 	}
 

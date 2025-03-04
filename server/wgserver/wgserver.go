@@ -30,18 +30,16 @@ type WGServer struct {
 }
 
 // NewWGServer creates a new instance of WGServer
-func NewWGServer() (WGServer, error) {
-	wgs := &WGServer{}
+func NewWGServer() (*WGServer, error) {
 	c, err := wgctrl.New()
 	if err != nil {
-		return *wgs, err
+		return nil, err
 	}
-	wgs.c = c
-	return *wgs, nil
+	return &WGServer{c: c}, nil
 }
 
-// Close releases resources used by a WGServer.
-func (wgs WGServer) Close() error {
+// Close closes the wireguard server
+func (wgs *WGServer) Close() error {
 	return wgs.c.Close()
 }
 
@@ -60,7 +58,11 @@ func pbKey2wgKey(key []byte) *wgtypes.Key {
 	if key == nil {
 		return nil
 	}
-	return (*wgtypes.Key)(key)
+	k, err := wgtypes.NewKey(key)
+	if err != nil {
+		return nil
+	}
+	return &k
 }
 
 // ConfigureDevice configures a WireGuard device by its interface name.
@@ -68,7 +70,7 @@ func pbKey2wgKey(key []byte) *wgtypes.Key {
 // If the device specified by name does not exist or is not a WireGuard device,
 // an error is returned which can be checked using `errors.Is(err, os.ErrNotExist)`
 // os.ErrInvalid is returned on invalid input.
-func (wgs WGServer) ConfigureDevice(name string, cfg *pb.Config) error {
+func (wgs *WGServer) ConfigureDevice(name string, cfg *pb.Config) error {
 	if name == "" {
 		return os.ErrInvalid
 	}
@@ -76,13 +78,13 @@ func (wgs WGServer) ConfigureDevice(name string, cfg *pb.Config) error {
 	listenPort := int(cfg.GetListenPort())
 	fwMark := int(cfg.GetFirewallMark())
 
-	peers := []wgtypes.PeerConfig{}
+	peers := make([]wgtypes.PeerConfig, 0, len(cfg.GetPeers()))
 	for _, p := range cfg.GetPeers() {
-		keppaliveInterval := p.GetPersistentKeepaliveInterval().AsDuration()
+		keepaliveInterval := p.GetPersistentKeepaliveInterval().AsDuration()
 
-		allowedIps := []net.IPNet{}
+		allowedIPs := make([]net.IPNet, 0, len(p.AllowedIps))
 		for _, ip := range p.AllowedIps {
-			allowedIps = append(allowedIps, net.IPNet{
+			allowedIPs = append(allowedIPs, net.IPNet{
 				IP:   ip.GetIp(),
 				Mask: ip.GetIpMask(),
 			})
@@ -93,9 +95,9 @@ func (wgs WGServer) ConfigureDevice(name string, cfg *pb.Config) error {
 			UpdateOnly:                  p.GetUpdateOnly(),
 			PresharedKey:                pbKey2wgKey(p.PresharedKey),
 			Endpoint:                    pb2UDPAddr(p.Endpoint),
-			PersistentKeepaliveInterval: &keppaliveInterval,
+			PersistentKeepaliveInterval: &keepaliveInterval,
 			ReplaceAllowedIPs:           p.GetReplaceAllowedIps(),
-			AllowedIPs:                  allowedIps,
+			AllowedIPs:                  allowedIPs,
 		})
 	}
 	wgCfg := wgtypes.Config{
@@ -110,12 +112,12 @@ func (wgs WGServer) ConfigureDevice(name string, cfg *pb.Config) error {
 }
 
 // Devices retrieves all WireGuard devices on this system.
-func (wgs WGServer) Devices() ([]*pb.Device, error) {
+func (wgs *WGServer) Devices() ([]*pb.Device, error) {
 	devices, err := wgs.c.Devices()
 	if err != nil {
-		return []*pb.Device{}, err
+		return nil, err
 	}
-	pbDevices := []*pb.Device{}
+	pbDevices := make([]*pb.Device, 0, len(devices))
 	for _, dev := range devices {
 		pbDev, err := convertWGDeviceToPb(dev)
 		if err != nil {
@@ -124,27 +126,22 @@ func (wgs WGServer) Devices() ([]*pb.Device, error) {
 		}
 		pbDevices = append(pbDevices, pbDev)
 	}
-	return pbDevices, err
+	return pbDevices, nil
 }
 
 // Device retrieves a WireGuard device by its interface name.
 //
 // If the device specified by name does not exist or is not a WireGuard device,
 // an error is returned which can be checked using `errors.Is(err, os.ErrNotExist)`.
-func (wgs WGServer) Device(name string) (*pb.Device, error) {
+func (wgs *WGServer) Device(name string) (*pb.Device, error) {
 	if name == "" {
-		return &pb.Device{}, os.ErrInvalid
+		return nil, os.ErrInvalid
 	}
 	dev, err := wgs.c.Device(name)
 	if err != nil {
-		return &pb.Device{}, err
+		return nil, err
 	}
-	pbDevice, err := convertWGDeviceToPb(dev)
-	if err != nil {
-		log.Printf("Converting to PB: %s", err)
-		return &pb.Device{}, err
-	}
-	return pbDevice, nil
+	return convertWGDeviceToPb(dev)
 }
 
 func udpAddr2Pb(udpAddr *net.UDPAddr) *pb.UDPAddr {
@@ -167,9 +164,9 @@ func wgKey2pbKey(key *wgtypes.Key) []byte {
 
 // convertWGDeviceToPb converts wgtypes.Device into pb.Device
 func convertWGDeviceToPb(dev *wgtypes.Device) (*pb.Device, error) {
-	peers := []*pb.Peer{}
+	peers := make([]*pb.Peer, 0, len(dev.Peers))
 	for _, p := range dev.Peers {
-		allowedIPs := []*pb.IPNet{}
+		allowedIPs := make([]*pb.IPNet, 0, len(p.AllowedIPs))
 		for _, ip := range p.AllowedIPs {
 			allowedIPs = append(allowedIPs, &pb.IPNet{
 				Ip:     ip.IP,
